@@ -120,6 +120,16 @@ int N1470::dropConnection(){
 
 int N1470::switchOn(int channel){
 
+  // Make sure connected
+  if (!connected_){
+  	
+  	fprintf(stderr,"Cannot switch on a channel on a module that is not connected\n");
+  	PRINT_ERR("switchOn",(unsigned long) channel);
+  	return -1;
+  	
+  }
+  
+
   // Check input
   if ((channel < 0) || (channel >=4)){
 
