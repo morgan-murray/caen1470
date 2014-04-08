@@ -167,10 +167,12 @@ int N1470::switchOn(int channel){
   strncat(cmd,"\r\n",2);
   
 
+#ifdef DEBUG
   // Write the actual command unless there's no device presenta s defined
   // at compile time, in which case we fake the connection
   // and pretend everything is OK
   fprintf(stderr,"Writing command to switch on N1470 module channel %d: ",channel);fprintf(stderr,cmd);
+#endif
 
 #ifdef NO_DEVICE
 
