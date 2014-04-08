@@ -127,6 +127,7 @@ int N1470::switchOn(int channel){
     return -channel;
   }
 
+  // Variables for string-munging
   unsigned long ret;
   std::string command;
   std::string target;
@@ -136,6 +137,7 @@ int N1470::switchOn(int channel){
   char * cmd;
   unsigned int bufLen, bufWrit;
 
+  // Get the correct character string to sewitch the associated channel on
   command = channel_on_cmd_;
   target = "$BD:XX";
   position = command.find(target);
@@ -150,6 +152,8 @@ int N1470::switchOn(int channel){
   replacement << "CH:" << channel;
   command = command.replace(position, target.size(), replacement.str());
   
+  // N1470 accepts C-style strings, no convert from std::string to c_str style
+  // need to append a Windows-style line ending (\<cr>\<lf>) to make N1470 realise it's the end of the command
   bufLen = command.size() + 3;
   bufWrit = 0;
   cmd = (char *)malloc(bufLen);
@@ -162,6 +166,10 @@ int N1470::switchOn(int channel){
   
   strncat(cmd,"\r\n",2);
   
+
+  // Write the actual command unless there's no device presenta s defined
+  // at compile time, in which case we fake the connection
+  // and pretend everything is OK
   fprintf(stderr,"Writing command to switch on N1470 module channel %d: ",channel);fprintf(stderr,cmd);
 
 #ifdef NO_DEVICE
@@ -173,7 +181,7 @@ int N1470::switchOn(int channel){
   
   if ((ret = FT_Write(dev_,cmd,bufLen,(LPDWORD) &bufWrit)) != FT_OK){
 
-    PRINT_ERR("FT_Write_Data",ret);
+    PRINT_ERR("FT_Write",ret);
     return -1;
   }
 
@@ -183,6 +191,7 @@ int N1470::switchOn(int channel){
     fprintf(stderr, "Buffersize mismatch: bufLen %u \t bufWrit %u\n",bufLen,bufWrit);
   }
 
+  // No memory leaks!
   free(cmd);
 
   return 0;

@@ -2,6 +2,10 @@
 
 #include "N1470.h"
 
+// Set of tests for N1470 module
+// Idea is to have this run even if there's no device connected, to check code
+// Done by wrapping actual device connection lines in N1470 with 
+// #ifdefs and defining NO_DEVICE at compile time.
 
 int main(int argc, char **argv){
 
@@ -37,6 +41,7 @@ int main(int argc, char **argv){
   }
   hv->dropConnection();
 
+  // Not strictly necessary, but it makes valgrind happy :-)
   delete hv;
   return 0;
 

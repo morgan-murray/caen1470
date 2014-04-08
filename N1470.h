@@ -13,7 +13,7 @@
 #define PRINT_ERR(name, err) fprintf(stderr,"Function %s failed with error code %lu in line %d of file %s\n", name, err, __LINE__, __FILE__)
 
 // Header file for C++ module related to CAEN N1470 4-channel HV NIM module
-// Not ethat the documentation switches between iset and ilim for the same quantity
+// Note that the documentation switches between iset and ilim for the same quantity
 // We restrict ourselves to iset for consistency.
 
 class N1470{
