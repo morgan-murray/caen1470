@@ -152,7 +152,7 @@ int N1470::switchOn(int channel){
   replacement << "CH:" << channel;
   command = command.replace(position, target.size(), replacement.str());
   
-  // N1470 accepts C-style strings, no convert from std::string to c_str style
+  // N1470 accepts C-style strings, now convert from std::string to c_str style
   // need to append a Windows-style line ending (\<cr>\<lf>) to make N1470 realise it's the end of the command
   bufLen = command.size() + 3;
   bufWrit = 0;
