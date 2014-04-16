@@ -9,7 +9,7 @@
 
 int main(int argc, char **argv){
 
-  N1470 *hv = new N1470();
+  N1470 *hv = new N1470(0);
 
   if (!(hv->isConnected())) fprintf(stderr,"HV unit not connected\n");
   

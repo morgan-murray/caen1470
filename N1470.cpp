@@ -1,8 +1,10 @@
+
 #include "N1470.h"
-// Default constructor. Make everything zero and get actual values in initialize function
+
+// Default constructor. Make everything apart from the board number zero and get actual values in initialize function
 // String commands are taken from the N1470 manual available at caen.it
-N1470::N1470() : 
-  BD_(0),
+N1470::N1470(int boardNumber) : 
+  BD_(boardNumber),
   connected_(false), 
   interlock_(0), 
   mon_cmd_("$BD:XX,CMD:MON,CH:X,PAR:XX"),
@@ -18,23 +20,76 @@ N1470::N1470() :
   interlock_cmd_("$BD:XX,CMD:SET,PAR:BDILKM,VAL:XX"),
   clearalarm_cmd_("$BD:XX,CMD:SET,PAR:BDCLR"){
 
-	for (int ch = 0; ch <= 3; ch++){
+  std::string * cmd_list_[] = {&mon_cmd_, &vset_cmd_, &iset_cmd_, &vmax_cmd_, 
+		 &rampup_cmd_, &rampdown_cmd_, &triptime_cmd_, 
+		 &tripmode_cmd_, &channel_on_cmd_, &channel_off_cmd_,
+		 &interlock_cmd_, &clearalarm_cmd_};  
+  
+  // set the board number in the command strings above
+  int pos;
+  std::ostringstream replacement;
+  std::string target = "$BD:XX";
+  
+  replacement << "$BD:" << BD_;
+  
+  for (int cmd = 0; cmd < CMD_LIST_LEN; cmd++){
 
-		vmon_[ch] = 0.0;
-		imon_[ch] = 0.0;
-		vset_[ch] = 0.0;
-		iset_[ch] = 0.0;
-		vmax_[ch] = 0.0;
-		
-		rampup_[ch] = 0;
-		rampdown_[ch] = 0;
+    pos = cmd_list_[cmd]->find(target);
+    cmd_list_[cmd]->replace(pos,target.size(),replacement.str());
 
-		triptime_[ch] = 0.0;
-		
-		tripmode_[ch] = 1; // By default have trip mean kill
-	}
-
+  }
+  
+  // Set all the intial values to 0
+  for (int ch = 0; ch <= 3; ch++){
+    
+    vmon_[ch] = 0.0;
+    imon_[ch] = 0.0;
+    vset_[ch] = 0.0;
+    iset_[ch] = 0.0;
+    vmax_[ch] = 0.0;
+    
+    rampup_[ch] = 0;
+    rampdown_[ch] = 0;
+    
+    triptime_[ch] = 0.0;
+    
+    tripmode_[ch] = 1; // By default have trip mean kill
+  }
+  
 };
+
+
+char * N1470::formCommand(std::string command, std::string target, std::string replacement){
+
+  int position;
+  char * cmd;
+  unsigned int bufLen;
+
+  std::string newCommand;
+
+  position = command.find(target);
+  if (position < 0){
+    std::cerr << "Target string " << target << " not found" << std::endl;
+    exit(1);
+  }
+  newCommand = command.replace(position, target.size(), replacement);
+  
+  // N1470 accepts C-style strings, now convert from std::string to c_str style
+  // need to append a Windows-style line ending (\<cr>\<lf>) to make N1470 realise it's the end of the command
+  bufLen = newCommand.size() + 3;
+  cmd = (char *)malloc(bufLen);
+
+  if (cmd == NULL){
+    fprintf(stderr,"No memory allocation possible!\n");
+    return NULL;
+  }
+  
+  std::strcpy(cmd,command.c_str());
+  strncat(cmd,"\r\n",2);
+  
+  return cmd;
+ 
+} 
 
 
 int N1470::makeConnection(){
@@ -120,6 +175,11 @@ int N1470::dropConnection(){
 
 int N1470::switchOn(int channel){
 
+  int bufLen, bufWrit;
+  char * cmd;
+  std::string target = "CH:X";
+  std::ostringstream replacement;
+
   // Make sure connected
   if (!connected_){
   	
@@ -129,7 +189,6 @@ int N1470::switchOn(int channel){
   	
   }
   
-
   // Check input
   if ((channel < 0) || (channel >=4)){
 
@@ -137,53 +196,19 @@ int N1470::switchOn(int channel){
     return -channel;
   }
 
-  // Variables for string-munging
-  unsigned long ret;
-  std::string command;
-  std::string target;
-  std::ostringstream replacement;
-  int position;
-
-  char * cmd;
-  unsigned int bufLen, bufWrit;
-
-  // Get the correct character string to sewitch the associated channel on
-  command = channel_on_cmd_;
-  target = "$BD:XX";
-  position = command.find(target);
-  replacement << "$BD:" << BD_;
-  command = command.replace(position,target.size(),replacement.str());
-
-  replacement.clear();
-  replacement.str("");
-  target = "CH:X";
-  
-  position = command.find(target);
+  // Form command properly
   replacement << "CH:" << channel;
-  command = command.replace(position, target.size(), replacement.str());
+  cmd = this->formCommand(channel_on_cmd_, target, replacement.str());  
   
-  // N1470 accepts C-style strings, now convert from std::string to c_str style
-  // need to append a Windows-style line ending (\<cr>\<lf>) to make N1470 realise it's the end of the command
-  bufLen = command.size() + 3;
-  bufWrit = 0;
-  cmd = (char *)malloc(bufLen);
-  snprintf(cmd,bufLen,command.c_str());
-
-  if (cmd == NULL){
-    fprintf(stderr,"No memory allocation possible!\n");
-    return -9999;
-  }
-  
-  strncat(cmd,"\r\n",2);
-  
-
 #ifdef DEBUG
   // Write the actual command unless there's no device presenta s defined
   // at compile time, in which case we fake the connection
   // and pretend everything is OK
-  fprintf(stderr,"Writing command to switch on N1470 module channel %d: ",channel);fprintf(stderr,cmd);
+  fprintf(stderr,"Writing command to switch on N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
 #endif
 
+  bufLen = std::strlen(cmd);
 #ifdef NO_DEVICE
 
   fprintf(stderr,"Faking switch on of channel %d\n",channel);
