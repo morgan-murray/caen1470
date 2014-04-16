@@ -34,11 +34,22 @@ int main(int argc, char **argv){
 
 
   hv->makeConnection();
+  
+  fprintf(stderr,"Switching channels on\n");
   for(int ii = 0; ii <=3; ii++){
    
-    hv->switchOn(ii);
+    hv->switchState(ii, true);
 
   }
+
+  fprintf(stderr,"Switching channels off\n");
+  for(int ii = 0; ii <=3; ii++){
+   
+    hv->switchState(ii, false);
+
+  }
+
+
   hv->dropConnection();
 
   // Not strictly necessary, but it makes valgrind happy :-)

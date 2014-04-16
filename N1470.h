@@ -93,8 +93,7 @@ class N1470{
   int dropConnection();
 
   // Returns 0 on success, non-zero on failure. Takes a channel number [0->3]
-  int switchOn(int);
-  int switchOff(int);
+  int switchState(int, bool);
 
   int updateValues();
 

@@ -173,7 +173,7 @@ int N1470::dropConnection(){
 };	
 
 
-int N1470::switchOn(int channel){
+int N1470::switchState(int channel, bool state){
 
   int bufLen, bufWrit;
   char * cmd;
@@ -184,7 +184,7 @@ int N1470::switchOn(int channel){
   if (!connected_){
   	
   	fprintf(stderr,"Cannot switch on a channel on a module that is not connected\n");
-  	PRINT_ERR("switchOn",(unsigned long) channel);
+  	PRINT_ERR("switchState",(unsigned long) channel);
   	return -1;
   	
   }
@@ -192,26 +192,32 @@ int N1470::switchOn(int channel){
   // Check input
   if ((channel < 0) || (channel >=4)){
 
-    PRINT_ERR("switchOn",(unsigned long)channel);
+    PRINT_ERR("switchState",(unsigned long)channel);
     return -channel;
   }
 
   // Form command properly
   replacement << "CH:" << channel;
-  cmd = this->formCommand(channel_on_cmd_, target, replacement.str());  
+  
+  if (state){
+    cmd = this->formCommand(channel_on_cmd_, target, replacement.str());
+  } else{
+    cmd = this->formCommand(channel_off_cmd_, target, replacement.str());
+  }
+
   
 #ifdef DEBUG
   // Write the actual command unless there's no device presenta s defined
   // at compile time, in which case we fake the connection
   // and pretend everything is OK
-  fprintf(stderr,"Writing command to switch on N1470 module channel %d: ",channel);
+  fprintf(stderr,"Writing command to switch state on N1470 module channel %d: ",channel);
   fputs(cmd,stderr);
 #endif
 
   bufLen = std::strlen(cmd);
 #ifdef NO_DEVICE
 
-  fprintf(stderr,"Faking switch on of channel %d\n",channel);
+  fprintf(stderr,"Faking switch state of channel %d\n",channel);
   bufWrit = bufLen;
   
 #else
