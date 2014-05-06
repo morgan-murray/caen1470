@@ -2,6 +2,6 @@ Initial project to read out a Caen N1470 HV NIM Module using C++.
 
 Assumes use of ftd2xx. Recent tarfile included. Compilation assumes that you choose the default naming scheme, that you store the library in /usr/local/lib and that location is in your LD_LIBRARY_PATH
 
-STATUS: Getters implemented and switchOn function implemented, but not tested. Basic tests for no-device situation written
+STATUS: Basic test cases for no device present written. Some initial communication with a real device over USB.
 
 M. Murray, April 2014.
