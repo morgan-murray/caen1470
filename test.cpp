@@ -32,9 +32,10 @@ int main(int argc, char **argv){
   }    
   fprintf(stderr,"\t Interlock: %d\n",hv->getInterlock());
 
-
-  hv->makeConnection();
   
+  hv->makeConnection();
+
+  /*
   fprintf(stderr,"Switching channels on\n");
   for(int ii = 0; ii <=3; ii++){
    
@@ -49,7 +50,13 @@ int main(int argc, char **argv){
 
   }
 
+  */
 
+  for(int ii = 0; ii <=3; ii++){
+    
+    hv->getActualVoltage(ii);
+    hv->printStatus(ii);
+  }
   hv->dropConnection();
 
   // Not strictly necessary, but it makes valgrind happy :-)

@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "ftd2xx.h"
 
@@ -13,7 +14,9 @@
 
 #define CH_MAX 4 // number of channels on board
 #define CMD_LIST_LEN 12
-
+#define RESPONSE_TIME 1 // the number of seconds that the board needs
+                        // to respond to a normal request
+#define BUFFER_SIZE 512
 #define PRINT_ERR(name, err) fprintf(stderr,"Function %s failed with error code %lu in line %d of file %s\n", name, err, __LINE__, __FILE__)
 
 // Header file for C++ module related to CAEN N1470 4-channel HV NIM module
@@ -60,6 +63,10 @@ class N1470{
   // Returns a char* to the command that should be sent to the module.
   char * formCommand(std::string, std::string, std::string);
 
+  // Writes a command to the N1470 and checks to make sure that it is written.
+  // Takes a command string and returns 0 if no problems.
+  int writeCommand(char *);
+
   // Get response from the board following a command
   // Takes std::string pointer to store response string 
   // Return 0 if response arrives, non-zero if response failed. In that case, response string set to NULL
@@ -69,22 +76,26 @@ class N1470{
   // If error, call parseError()
   // If not error, fill the appropriate internal variables
   // Return 0 if OK, non-zero if error.
-  int parseResponse(std::string);
+  int parseResponse(std::string *, int type, double *value);
 
   // Parse an error response
   // returns 0 if error string parsed correctly, non-zero if error string not parsed
   int parseError(std::string);
 
-  // Prints the current status to stdout
-  // Returns zero on success
-  // returns non-zero if error
-  int printStatus();
 
+  // Takes a channel number as argument and checks that it is within [0,3]
+  void channelCheck(int);
+
+  
 
  public:
 
   N1470(int);
 
+  // Prints the current status to stdout
+  // Returns status field
+  double printStatus(int);
+  
   // Returns true if connected, false if not connected
   bool isConnected(){ return connected_; }
 
@@ -127,6 +138,9 @@ class N1470{
 		
   // returns the device handle of the current module if set. If not set, return NULL.
   FT_HANDLE getDeviceHandle(){ if (connected_) return dev_; else return NULL;}
+
+  // gets the actual settings on the board
+  double getActualVoltage(int channel);
 
   // gets the voltage for a channel in Volts. Takes channel number [0-3]. Returns correct value on success, -9999 on error.
   double getVmon(int ch) { if ((ch >= 0) && (ch < CH_MAX)) return vmon_[ch]; else return -9999; }

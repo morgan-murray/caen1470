@@ -92,6 +92,8 @@ char * N1470::formCommand(std::string command, std::string target, std::string r
 } 
 
 
+  
+
 int N1470::makeConnection(){
 
 #ifndef NO_DEVICE
@@ -175,7 +177,7 @@ int N1470::dropConnection(){
 
 int N1470::switchState(int channel, bool state){
 
-  int bufLen, bufWrit;
+  int bufLen, bufWrit, ret;
   char * cmd;
   std::string target = "CH:X";
   std::ostringstream replacement;
@@ -224,7 +226,7 @@ int N1470::switchState(int channel, bool state){
   
   if ((ret = FT_Write(dev_,cmd,bufLen,(LPDWORD) &bufWrit)) != FT_OK){
 
-    PRINT_ERR("FT_Write",ret);
+    PRINT_ERR("FT_Write",(unsigned long)ret);
     return -1;
   }
 
@@ -238,4 +240,272 @@ int N1470::switchState(int channel, bool state){
   free(cmd);
 
   return 0;
+}
+
+
+void N1470::channelCheck(int channel){
+
+  if (channel < 0 || channel >=4){
+    std::cerr << "Channel call of " << channel << " not understood" << std::endl;
+    exit(1);
+  }
+
+}
+    
+int N1470::writeCommand(char *cmd){
+
+  int bufLen, bufWrit, ret;
+  bufLen = strlen(cmd); 
+
+#ifdef DEBUG
+
+  std::cerr << "Writing the following command to the device: " << cmd << std::endl;
+
+#endif
+
+#ifndef NO_DEVICE
+
+  if ((ret = FT_Write(dev_,cmd,bufLen,(LPDWORD) &bufWrit)) != FT_OK){
+
+    PRINT_ERR("FT_Write", (long unsigned)ret);
+    free(cmd);	
+    return -1;
+  }
+
+#else
+  std::cerr << "Faking successful write" << std::endl;
+  bufWrit = bufLen;
+#endif
+  
+  if(bufWrit != bufLen){
+    fprintf(stderr, "Buffersize mismatch: bufLen %u \t bufWrit %u\n",bufLen,bufWrit);
+    return -1;
+  }
+
+ return 0;
+
+}
+
+double N1470::printStatus(int channel){
+  
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+
+  double status;
+ 
+  channelCheck(channel);
+
+  replacement << "CH:" << channel << ",PAR:STAT";
+  cmd = this->formCommand(mon_cmd_,target,replacement.str());
+
+#ifdef DEBUG
+  std::cerr << "Getting the status of channel " << channel << std::endl;
+#endif
+
+ if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the voltage" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG
+  std::cout << "Parsing response:" << std::endl;
+#endif
+
+  if (parseResponse(response,2,&status) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+
+#ifdef DEBUG
+  fprintf(stderr,"Status was %x\n",(unsigned)status);
+#endif
+
+  // No memory leaks!                                                      
+  free(cmd);
+  delete(response);
+  return status;
+
+}
+
+double N1470::getActualVoltage(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double voltage;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                                            
+  replacement << "CH:" << channel << ",PAR:VMON";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get actual value of voltage N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the voltage" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+ //  bufLen = std::strlen(cmd);
+// #ifdef NO_DEVICE
+
+//   fprintf(stderr,"Faking monitor of channel %d\n",channel);
+//   bufWrit = bufLen;
+
+// #else
+
+//   if ((ret = FT_Write(dev_,cmd,bufLen,(LPDWORD) &bufWrit)) != FT_OK){
+
+//     PRINT_ERR("FT_Write", (long unsigned)ret);
+//     delete(response);
+//     free(cmd);	
+//     return -1;
+//   }
+
+// #endif
+
+//   if(bufWrit != bufLen){
+//     fprintf(stderr, "Buffersize mismatch: bufLen %u \t bufWrit %u\n",bufLen,bufWrit);
+//   }
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&voltage) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Voltage was " << voltage << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return voltage;
+
+}
+
+
+int N1470::getResponse(std::string * accumulator){
+  
+  char * buf; 
+  
+  DWORD bufLenWd, bufWrtWd, status, bufRead;
+  int ret;
+
+  buf = (char *)calloc(BUFFER_SIZE, sizeof(char));
+
+  bufLenWd = 0;
+  bufWrtWd = 0;
+  status = 0;
+  bufRead = 0;
+  ret = 0;
+
+  sleep(RESPONSE_TIME);
+  
+#ifdef DEBUG
+  std::cout << "bufLenWd BufWrtWd Status" << std::endl;
+  std::cout << bufLenWd << " " << bufWrtWd << " " << status << std::endl;
+#endif
+
+  do {
+
+    if((ret = FT_GetStatus(dev_, &bufLenWd, &bufWrtWd, &status)) != FT_OK){
+      PRINT_ERR("FT_GetStatus",(long unsigned)ret);
+      return 1;
+    }
+      
+    if (bufLenWd > BUFFER_SIZE){
+
+      buf = (char *)realloc(buf,bufLenWd);
+      
+      if (buf == NULL){
+
+	fprintf(stderr,"OOM ERROR on buffer length %ul\n",bufLenWd);
+	return 1;
+      }
+    }      
+    
+    if((ret = FT_Read(dev_,buf, bufLenWd, &bufRead))!=FT_OK){
+      PRINT_ERR("FT_Read",(long unsigned)ret);
+      return 1;
+    }
+
+    // Null-terminate the response
+    buf[bufLenWd] = '\0';
+
+    std::cout << "Accumulating buffer" << std::endl;	    
+    puts(buf);
+    accumulator->append(buf);
+  }  while (bufLenWd!=0);
+  
+  return 0; 
+}
+
+
+int N1470::parseResponse(std::string *response, int type, double *value){
+
+  unsigned loc;
+
+  if ((loc = response->find("OK")) == std::string::npos){
+
+    std::cerr << "Something has gone wrong. Command failed!" << std::endl;
+    return -1;
+
+  }
+
+  
+  if(type == 2){
+
+    if (sscanf(response->substr(loc).c_str(),"OK,VAL:%lf",value) != 1){
+
+      std::cerr << "Could nto interpret a value from the response" << std::endl;
+      return -2;
+    }
+  }
+    
+  return 0;
+
 }
