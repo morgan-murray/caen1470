@@ -110,19 +110,20 @@ class N1470{
 
   // Sets the voltage for a channel in Volts. Takes channel number [0-3] and value [0000.00 - 8000.00]. Returns correct value on success, -9999 on error.
   double setVoltage(int, double);
+  // Same for current
+  double setCurrent(int, double);
 
-  // Sets the maximum current for a channel in Volts. Takes channel number [0-3] and value [0000.00 - 3000.00]. Returns correct value on success, -9999 on error.
-  double setMaxcurrent(int, double);
   // Sets the maximum voltage for a channel. Takes channel number (0-3) and value (0000.00-8100.00). Returns correct value on success, -9999 on error.
-  double setMaxvoltage(int, double);
+  double setMaxVoltage(int, double);
 
   // Sets the ramp up for a channel. Takes channel number (0-3) and value (000 - 999). Returns correct value on success, -9999 on error.
-  int setRampup(int, int);
+  
+  double setRampUpRate(int, double);
   // Sets the ramp down for a channel. Takes channel number (0-3) and value (000 - 999). Returns correct value on success, -9999 on error.
   int setRampdown(int, int);
 		
   // Sets the trip time for a channel. Takes channel number (0-3) and value (0000.0 - 9999.9). Returns correct value on success, -9999 on error.
-  double setTriptime(int, double);
+  double setTripTime(int, double);
 
   // Sets the power down mode for a channel. Takes a channel number and an integer: 0 = RAMP, 1 = KILL. Returns 0 on success -9999 on error.
   int setTripmode(int, int);
@@ -141,6 +142,7 @@ class N1470{
 
   // gets the actual settings on the board
   double getActualVoltage(int channel);
+  double getActualCurrent(int channel);
 
   // gets the voltage for a channel in Volts. Takes channel number [0-3]. Returns correct value on success, -9999 on error.
   double getVmon(int ch) { if ((ch >= 0) && (ch < CH_MAX)) return vmon_[ch]; else return -9999; }
@@ -150,21 +152,24 @@ class N1470{
   // gets the maximum current for a channel in Volts. Takes channel number [0-3]. Returns correct value on success, -9999 on error.
   double getMaxCurrent(int ch) { if ((ch >= 0) && (ch < CH_MAX)) return iset_[ch]; else return -9999; }
   // gets the maximum voltage for a channel. Takes channel number (0-3). Returns correct value on success, -9999 on error.
-  double getMaxVoltage(int ch) { if((ch >= 0) && (ch < CH_MAX)) return vmax_[ch]; else return -9999; }
+  double getMaxVoltage(int ch);
 
   // gets the ramp up for a channel. Takes channel number (0-3). Returns correct value on success, -9999 on error.
-  int getRampUp(int ch) { if ((ch >= 0) && (ch < CH_MAX)) return rampup_[ch]; else return -9999; }
+  double getRampUpRate(int ch);// { if ((ch >= 0) && (ch < CH_MAX)) return rampup_[ch]; else return -9999; }
   // gets the ramp down for a channel. Takes channel number (0-3). Returns correct value on success, -9999 on error.
   int getRampDown(int ch) { if ((ch >= 0) && (ch < CH_MAX)) return rampdown_[ch]; else return -9999; }
 		
   // gets the trip time for a channel. Takes channel number (0-3). Returns correct value on success, -9999 on error.
-  double getTripTime(int ch){ if ((ch >= 0) && (ch < CH_MAX)) return triptime_[ch]; else return -9999; }
+  double getTripTime(int ch);//{ if ((ch >= 0) && (ch < CH_MAX)) return triptime_[ch]; else return -9999; }
+  double getPolarity(int);
 
   // gets the power down mode for a channel.Returns 0 = RAMP, 1 = KILL, -9999 on error.
   int getTripMode(int ch){ if ((ch >= 0) && (ch < CH_MAX)) return tripmode_[ch]; else return -9999; }
 
   // gets the interlock mode of the board. 0 = OPEN, 1 = CLOSED
   int getInterlock(){ return interlock_; }
+
+  void parseChannelStatus(double);
 
 };
 

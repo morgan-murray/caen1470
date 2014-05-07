@@ -10,7 +10,7 @@ N1470::N1470(int boardNumber) :
   mon_cmd_("$BD:XX,CMD:MON,CH:X,PAR:XX"),
   vset_cmd_("$BD:XX,CMD:SET,CH:X,PAR:VSET,VAL:XX"),
   iset_cmd_("$BD:XX,CMD:SET,CH:X,PAR:ISET,VAL:XX"),
-  vmax_cmd_("$BD:XX,CMD:SET,CH:X,PAR:VMAX,VAL:XX"),
+  vmax_cmd_("$BD:XX,CMD:SET,CH:X,PAR:MAXV,VAL:XX"),
   rampup_cmd_("$BD:XX,CMD:SET,CH:X,PAR:RUP,VAL:XX"),
   rampdown_cmd_("$BD:XX,CMD:SET,CH:X,PAR:RDW,VAL:XX"),
   triptime_cmd_("$BD:XX,CMD:SET,CH:X,PAR:TRIP,VAL:XX"),
@@ -97,52 +97,52 @@ char * N1470::formCommand(std::string command, std::string target, std::string r
 int N1470::makeConnection(){
 
 #ifndef NO_DEVICE
+  
+ 
+  unsigned long ret;
+  
+  if ((ret = FT_Open(0, &dev_)) != FT_OK){
+    
+    PRINT_ERR("FT_Open", ret);
+    return -1;
+    
+  }
 
-
-	unsigned long ret;
-
-	if ((ret = FT_Open(0, &dev_)) != FT_OK){
-
-	  PRINT_ERR("FT_Open", ret);
-	  return -1;
-	
-	} 
-
-	if ((ret = FT_SetBaudRate(dev_, FT_BAUD_9600)) != FT_OK){
-
-	  PRINT_ERR("FT_SetBaudRate",ret);
-	  return -2;
-	  
-	}
-	
-	
-	if ((ret = FT_SetDataCharacteristics(dev_, FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE )) != FT_OK){
-	  
-	  PRINT_ERR("FT_SetDataCharacteristics",ret);
-	  return -3;
-	  
-	}
-	
-	
-	if ((ret = FT_Purge(dev_, (FT_PURGE_RX & FT_PURGE_TX))) != FT_OK){
-	  
-	  PRINT_ERR("FT_Purge", ret);
-	  return -4;
-	  
-	}
-
+  if ((ret = FT_SetBaudRate(dev_, FT_BAUD_9600)) != FT_OK){
+    
+    PRINT_ERR("FT_SetBaudRate",ret);
+    return -2;
+    
+  }
+  
+  
+  if ((ret = FT_SetDataCharacteristics(dev_, FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE )) != FT_OK){
+    
+    PRINT_ERR("FT_SetDataCharacteristics",ret);
+    return -3;
+    
+  }
+  
+  
+  if ((ret = FT_Purge(dev_, (FT_PURGE_RX & FT_PURGE_TX))) != FT_OK){
+    
+    PRINT_ERR("FT_Purge", ret);
+    return -4;
+    
+  }
+  
 #endif
-	connected_ = true;
+  connected_ = true;
 
 
 
 #ifdef DEBUG
-	fprintf(stderr,"Connected to the device with Board ID: %d\n",BD_);
+  fprintf(stderr,"Connected to the device with Board ID: %d\n",BD_);
 #endif
 	
-	return 0;
-	
-};
+  return 0;
+  
+};	
 
 int N1470::dropConnection(){
 
@@ -181,7 +181,7 @@ int N1470::switchState(int channel, bool state){
   char * cmd;
   std::string target = "CH:X";
   std::ostringstream replacement;
-
+  std::string *response = new std::string();
   // Make sure connected
   if (!connected_){
   	
@@ -208,7 +208,7 @@ int N1470::switchState(int channel, bool state){
   }
 
   
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   // Write the actual command unless there's no device presenta s defined
   // at compile time, in which case we fake the connection
   // and pretend everything is OK
@@ -224,21 +224,39 @@ int N1470::switchState(int channel, bool state){
   
 #else
   
-  if ((ret = FT_Write(dev_,cmd,bufLen,(LPDWORD) &bufWrit)) != FT_OK){
+  if (writeCommand(cmd) != 0){
 
-    PRINT_ERR("FT_Write",(unsigned long)ret);
-    return -1;
+    std::cerr << "There was a problem switching state on channel" << channel << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
   }
 
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
 #endif
 
-  if(bufWrit != bufLen){
-    fprintf(stderr, "Buffersize mismatch: bufLen %u \t bufWrit %u\n",bufLen,bufWrit);
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,NULL) != 0){
+    std::cerr << "Could not parse response" << std::endl;
   }
+#endif
 
-  // No memory leaks!
+  // No memory leaks!                                                      
+  delete(response);
   free(cmd);
-
   return 0;
 }
 
@@ -257,7 +275,7 @@ int N1470::writeCommand(char *cmd){
   int bufLen, bufWrit, ret;
   bufLen = strlen(cmd); 
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
 
   std::cerr << "Writing the following command to the device: " << cmd << std::endl;
 
@@ -300,7 +318,7 @@ double N1470::printStatus(int channel){
   replacement << "CH:" << channel << ",PAR:STAT";
   cmd = this->formCommand(mon_cmd_,target,replacement.str());
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   std::cerr << "Getting the status of channel " << channel << std::endl;
 #endif
 
@@ -320,12 +338,12 @@ double N1470::printStatus(int channel){
     exit(1);
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   std::cout << "Printing response:" << std::endl;
   std::cout << (*response) << std::endl;
 #endif
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   std::cout << "Parsing response:" << std::endl;
 #endif
 
@@ -340,6 +358,7 @@ double N1470::printStatus(int channel){
   // No memory leaks!                                                      
   free(cmd);
   delete(response);
+  parseChannelStatus(status);
   return status;
 
 }
@@ -354,11 +373,11 @@ double N1470::getActualVoltage(int channel){
  
   channelCheck(channel);
 
-  // Form command properly                                                                                                            
+  // Form command properly                                                                                
   replacement << "CH:" << channel << ",PAR:VMON";
   cmd = this->formCommand(mon_cmd_, target, replacement.str());
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   // Write the actual command unless there's no device present as defined                                       
   // at compile time, in which case we fake the connection                                                      
   // and pretend everything is OK                                                                                                     
@@ -375,28 +394,6 @@ double N1470::getActualVoltage(int channel){
   }
     
 
- //  bufLen = std::strlen(cmd);
-// #ifdef NO_DEVICE
-
-//   fprintf(stderr,"Faking monitor of channel %d\n",channel);
-//   bufWrit = bufLen;
-
-// #else
-
-//   if ((ret = FT_Write(dev_,cmd,bufLen,(LPDWORD) &bufWrit)) != FT_OK){
-
-//     PRINT_ERR("FT_Write", (long unsigned)ret);
-//     delete(response);
-//     free(cmd);	
-//     return -1;
-//   }
-
-// #endif
-
-//   if(bufWrit != bufLen){
-//     fprintf(stderr, "Buffersize mismatch: bufLen %u \t bufWrit %u\n",bufLen,bufWrit);
-//   }
-
   if (getResponse(response) != 0){
     
     fprintf(stderr,"Could not get response\n");
@@ -405,12 +402,12 @@ double N1470::getActualVoltage(int channel){
     exit(1);
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   std::cout << "Printing response:" << std::endl;
   std::cout << (*response) << std::endl;
 #endif
 
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   std::cout << "Parsing response:" << std::endl;
 #endif
   if (parseResponse(response,2,&voltage) != 0){
@@ -427,6 +424,630 @@ double N1470::getActualVoltage(int channel){
 
 }
 
+double N1470::getActualCurrent(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double current;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:IMON";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get actual current N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the current" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&current) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Current was " << current << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return current;
+
+}
+
+
+double N1470::getTripTime(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double tripTime;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:TRIP";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get trip time N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the trip time" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&tripTime) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Trip Time is " << tripTime << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return tripTime;
+
+}
+
+double N1470::getPolarity(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double polarity;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:POL";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get polarity N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the polarity" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&polarity) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Polarity is " << polarity << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return polarity;
+
+}
+
+double N1470::getMaxVoltage(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double voltage;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:MAXV";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get trip time N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the trip time" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&voltage) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Max voltage is " << voltage << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return voltage;
+
+}
+
+double N1470::getRampUpRate(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double rate;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:RUP";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get ramp up rate N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the ramp up rate" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&rate) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Ramp up rate is " << rate << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return rate;
+
+}
+
+double N1470::setRampUpRate(int channel, double rate){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:RUP,VAL:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+ 
+  channelCheck(channel);
+  if (rate < 0 || rate > 500){
+    std::cerr << "Rate is outside of limits" << std::endl;
+    return -1;
+  }
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:RUP,VAL:" << rate;
+  cmd = this->formCommand(rampup_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to set ramp up rate N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to set the ramp up rate" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,&rate) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Ramp up rate was set to " << rate << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return rate;	
+}
+
+
+double N1470::setVoltage(int channel, double voltage){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:VSET,VAL:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+ 
+  channelCheck(channel);
+  if (voltage < 0 || voltage > 1500){
+    std::cerr << "Voltage is outside of limits" << std::endl;
+    return -1;
+  }
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:VSET,VAL:" << voltage;
+  cmd = this->formCommand(vset_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to set voltage N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to set the voltage" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,&voltage) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Voltage was set to " << voltage << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return voltage;	
+}
+
+	
+double N1470::setMaxVoltage(int channel, double voltage){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:MAXV,VAL:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+ 
+  channelCheck(channel);
+  if (voltage < 0 || voltage > 1500){
+    std::cerr << "Voltage is outside of limits" << std::endl;
+    return -1;
+  }
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:MAXV,VAL:" << voltage;
+  cmd = this->formCommand(vmax_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to set voltage N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to set the voltage" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,&voltage) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Max voltage was set to " << voltage << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return voltage;	
+}	
+
+double N1470::setCurrent(int channel, double current){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:ISET,VAL:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+ 
+  channelCheck(channel);
+  if (current < 0 || current > 3000){
+    std::cerr << "Current is outside of limits" << std::endl;
+    return -1;
+  }
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:ISET,VAL:" << current;
+  cmd = this->formCommand(iset_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to set current N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to set the current" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,&current) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Current was set to " << current << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return current;
+
+}
+
+double N1470::setTripTime(int channel, double tripTime){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:TRIP,VAL:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+ 
+  channelCheck(channel);
+  if (tripTime < 0 || tripTime > 25){
+    std::cerr << "tripTime is outside of limits" << std::endl;
+    return -1;
+  }
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:TRIP,VAL:" << tripTime;
+  cmd = this->formCommand(triptime_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to set trip time N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to set the trip time" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,&tripTime) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Trip Time was set to " << tripTime << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return tripTime;
+
+}
 
 int N1470::getResponse(std::string * accumulator){
   
@@ -445,7 +1066,7 @@ int N1470::getResponse(std::string * accumulator){
 
   sleep(RESPONSE_TIME);
   
-#ifdef DEBUG
+#ifdef DEBUG_MAX
   std::cout << "bufLenWd BufWrtWd Status" << std::endl;
   std::cout << bufLenWd << " " << bufWrtWd << " " << status << std::endl;
 #endif
@@ -476,36 +1097,105 @@ int N1470::getResponse(std::string * accumulator){
     // Null-terminate the response
     buf[bufLenWd] = '\0';
 
-    std::cout << "Accumulating buffer" << std::endl;	    
+#ifdef DEBUG_MAX
+    std::cerr << "Accumulating buffer" << std::endl;	    
     puts(buf);
+#endif
     accumulator->append(buf);
   }  while (bufLenWd!=0);
   
   return 0; 
 }
 
-
 int N1470::parseResponse(std::string *response, int type, double *value){
 
-  unsigned loc;
-
-  if ((loc = response->find("OK")) == std::string::npos){
-
+    int loc, loc2;	
+    loc = response->find("OK");
+    if (loc == -1)
+      {	
+    std::cerr << loc << std::endl;
     std::cerr << "Something has gone wrong. Command failed!" << std::endl;
-    return -1;
+    return -9;
+  }		
 
-  }
-
-  
-  if(type == 2){
-
-    if (sscanf(response->substr(loc).c_str(),"OK,VAL:%lf",value) != 1){
-
-      std::cerr << "Could nto interpret a value from the response" << std::endl;
-      return -2;
-    }
-  }
+    if(type == 2){
     
+    loc2 = response->find("VAL:+\r\n",0,5);
+
+    if ( loc2  != -1){   
+#ifdef DEBUG_MAX
+    std::cerr << *response;
+#endif
+    *value = 1;	
+    return 0;
+  }				
+    else if ((loc2 = response->find("VAL:-\r\n",0,5)) != -1){
+#ifdef DEBUG_MAX
+    std::cerr << *response;
+#endif
+    *value = -1;
+    return 0;
+  }			
+    
+    
+    
+    if (sscanf(response->substr(loc).c_str(),"OK,VAL:%lf",value) != 1){
+    
+    std::cerr << "Could not interpret a value from the response: " << *response << std::endl;
+    return -2;
+  }			
+  }
+  
   return 0;
 
-}
+  }	
+
+void N1470::parseChannelStatus(double statusDb){
+    
+    int status = (int)statusDb;
+
+    if ((status>>0) & 0x1)
+      std::cerr << "Channel is on" << std::endl;
+    else
+      std::cerr << "Channel is off" << std::endl;
+
+    if ((status>>1) & 0x1)
+      std::cerr << "Channel is ramping up" << std::endl;
+
+    if ((status>>2) & 0x1)
+      std::cerr << "Channel is ramping down" << std::endl;
+
+    if ((status>>3) & 0x1)
+      std::cerr << "IMON > ISET" << std::endl;
+
+    if ((status>>4) & 0x1)
+      std::cerr << "VMON > VSET + 250V Tolerance" << std::endl;
+
+    if ((status>>5) & 0x1)
+      std::cerr << "VMON < VSET - 250V Tolerance" << std::endl;
+
+    if ((status>>6) & 0x1)
+      std::cerr << "VOUT AT MAXV" << std::endl;
+
+    if ((status>>7) & 0x1)
+      std::cerr << "CHANNEL HAS TRIPPED" << std::endl;
+ 
+    if ((status>>8) & 0x1)
+      std::cerr << "MAX POWER IS EXCEEDED" << std::endl;
+
+    if ((status>>9) & 0x1)
+      std::cerr << "TEMP > 105c MAXIMUM" << std::endl;
+
+    if ((status>>10) & 0x1)
+      std::cerr << "CHANNEL IS DISABLED" << std::endl;
+    
+    if ((status>>11) & 0x1)
+      std::cerr << "CHANNEL KILLED BY FRONT PANEL" << std::endl;
+
+    if ((status>>12) & 0x1)
+      std::cerr << "CHANNEL INTERLOCKED BY FRONT PANEL" << std::endl;
+
+    if ((status>>13) & 0x1)
+      std::cerr << "CHANNEL CALIBRATION ERROR" << std::endl;
+
+  }
