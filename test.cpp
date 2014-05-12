@@ -12,13 +12,10 @@ int main(int argc, char **argv){
   N1470 *hv = new N1470(0);
 
   if (!(hv->isConnected())) fprintf(stderr,"HV unit not connected\n");
-  
-  fprintf(stderr,"\t Interlock: %d\n",hv->getInterlock());
 
-  
   hv->makeConnection();
 
-  
+
   for(int ii = 0; ii <=3; ii++){
 
     std::cerr << "Now on channel " << ii << std::endl;
@@ -37,7 +34,7 @@ int main(int argc, char **argv){
     (void)hv->getPolarity(ii);
 
     (void)hv->printStatus(ii);
-    
+
     std::cerr << "========================================" << std::endl;
   }
 

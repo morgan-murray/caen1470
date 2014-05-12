@@ -1,12 +1,14 @@
 
 #include "N1470.h"
 
-// Default constructor. Make everything apart from the board number zero and get actual values in initialize function
+// // Default constructor. Make everything apart from the board number zero and get
+// actual values in initialize function
 // String commands are taken from the N1470 manual available at caen.it
 N1470::N1470(int boardNumber) : 
   BD_(boardNumber),
   connected_(false), 
   interlock_(0), 
+  board_name_("$BD:XX,CMD:MON,PAR:BDNAME\r\n"),
   mon_cmd_("$BD:XX,CMD:MON,CH:X,PAR:XX"),
   vset_cmd_("$BD:XX,CMD:SET,CH:X,PAR:VSET,VAL:XX"),
   iset_cmd_("$BD:XX,CMD:SET,CH:X,PAR:ISET,VAL:XX"),
@@ -92,8 +94,6 @@ char * N1470::formCommand(std::string command, std::string target, std::string r
 } 
 
 
-  
-
 int N1470::makeConnection(){
 
 #ifndef NO_DEVICE
@@ -144,6 +144,39 @@ int N1470::makeConnection(){
   
 };	
 
+int N1470::readBoardName(){
+  
+  std::string * response = new std::string();
+
+  char cmd[80];
+
+  strcpy(cmd,board_name_.c_str());
+
+  if(writeCommand(cmd)!=0){
+
+    std::cerr << "Problem writing command to get board name!\n" << std::endl;
+    delete(response);
+    return -1;
+  }
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  return 0;
+}
+
+
 int N1470::dropConnection(){
 
 #ifndef NO_DEVICE
@@ -177,7 +210,6 @@ int N1470::dropConnection(){
 
 int N1470::switchState(int channel, bool state){
 
-  int bufLen, bufWrit, ret;
   char * cmd;
   std::string target = "CH:X";
   std::ostringstream replacement;
@@ -216,13 +248,6 @@ int N1470::switchState(int channel, bool state){
   fputs(cmd,stderr);
 #endif
 
-  bufLen = std::strlen(cmd);
-#ifdef NO_DEVICE
-
-  fprintf(stderr,"Faking switch state of channel %d\n",channel);
-  bufWrit = bufLen;
-  
-#else
   
   if (writeCommand(cmd) != 0){
 
@@ -252,7 +277,7 @@ int N1470::switchState(int channel, bool state){
   if (parseResponse(response,1,NULL) != 0){
     std::cerr << "Could not parse response" << std::endl;
   }
-#endif
+
 
   // No memory leaks!                                                      
   delete(response);
@@ -730,6 +755,67 @@ double N1470::getRampUpRate(int channel){
 
 }
 
+double N1470::getRampDownRate(int channel){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+  double rate;
+ 
+  channelCheck(channel);
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:RDW";
+  cmd = this->formCommand(mon_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to get ramp down rate N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to read out the ramp down rate" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,2,&rate) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Ramp down rate is " << rate << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return rate;
+
+}
+
 double N1470::setRampUpRate(int channel, double rate){
 
   char * cmd;
@@ -793,6 +879,68 @@ double N1470::setRampUpRate(int channel, double rate){
   return rate;	
 }
 
+double N1470::setRampDownRate(int channel, double rate){
+
+  char * cmd;
+  std::string target = "CH:X,PAR:RDW,VAL:XX";
+  std::string *response = new std::string();
+  std::ostringstream replacement;
+ 
+  channelCheck(channel);
+  if (rate < 0 || rate > 500){
+    std::cerr << "Rate is outside of limits" << std::endl;
+    return -1;
+  }
+
+  // Form command properly                                                                                
+  replacement << "CH:" << channel << ",PAR:RDW,VAL:" << rate;
+  cmd = this->formCommand(rampup_cmd_, target, replacement.str());
+
+#ifdef DEBUG_MAX
+  // Write the actual command unless there's no device present as defined                                       
+  // at compile time, in which case we fake the connection                                                      
+  // and pretend everything is OK                                                                                                     
+  fprintf(stderr,"Writing command to set ramp down rate N1470 module channel %d: ",channel);
+  fputs(cmd,stderr);
+#endif
+
+  if (writeCommand(cmd) != 0){
+
+    std::cerr << "There was a problem writing the command to set the ramp down rate" << std::endl;
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+    
+
+  if (getResponse(response) != 0){
+    
+    fprintf(stderr,"Could not get response\n");
+    free(cmd);
+    delete(response);
+    exit(1);
+  }
+
+#ifdef DEBUG_MAX
+  std::cout << "Printing response:" << std::endl;
+  std::cout << (*response) << std::endl;
+#endif
+
+#ifdef DEBUG_MAX
+  std::cout << "Parsing response:" << std::endl;
+#endif
+  if (parseResponse(response,1,&rate) != 0){
+    std::cerr << "Could not parse response" << std::endl;
+  }
+#ifdef DEBUG
+  std::cout << "Ramp down rate was set to " << rate << std::endl;
+#endif
+
+  // No memory leaks!                                                      
+  delete(response);
+  free(cmd);
+  return rate;	
+}
 
 double N1470::setVoltage(int channel, double voltage){
 
