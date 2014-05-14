@@ -13,9 +13,10 @@
 #include <sstream>
 
 #define CH_MAX 4 // number of channels on board
-#define CMD_LIST_LEN 12
-#define RESPONSE_TIME 1 // the number of seconds that the board needs
+#define CMD_LIST_LEN_N1470 12
+#define RESPONSE_TIME_N1470 1 // the number of seconds that the board needs
                         // to respond to a normal request
+#define NUYMBER_OF_RETRIES 5
 #define BUFFER_SIZE 512
 #define PRINT_ERR(name, err) fprintf(stderr,"Function %s failed with error code %lu in line %d of file %s\n", name, err, __LINE__, __FILE__)
 

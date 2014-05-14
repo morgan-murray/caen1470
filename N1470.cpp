@@ -34,7 +34,7 @@ N1470::N1470(int boardNumber) :
   
   replacement << "$BD:" << BD_;
   
-  for (int cmd = 0; cmd < CMD_LIST_LEN; cmd++){
+  for (int cmd = 0; cmd < CMD_LIST_LEN_N1470; cmd++){
 
     pos = cmd_list_[cmd]->find(target);
     cmd_list_[cmd]->replace(pos,target.size(),replacement.str());
@@ -171,9 +171,15 @@ int N1470::readBoardName(){
   std::cout << (*response) << std::endl;
 #endif
 
-  // No memory leaks!                                                      
+  int loc = response->find("N1470");
   delete(response);
-  return 0;
+
+  if (loc >= 0){
+    return 0;
+  }
+  else{
+    return -1;
+  }
 }
 
 
@@ -1212,7 +1218,7 @@ int N1470::getResponse(std::string * accumulator){
   bufRead = 0;
   ret = 0;
 
-  sleep(RESPONSE_TIME);
+  sleep(RESPONSE_TIME_N1470);
   
 #ifdef DEBUG_MAX
   std::cout << "bufLenWd BufWrtWd Status" << std::endl;
